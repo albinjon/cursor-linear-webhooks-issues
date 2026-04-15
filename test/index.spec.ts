@@ -340,7 +340,7 @@ describe("Linear webhook router", () => {
 			action: "create",
 			data: {
 				id: "reaction-uuid",
-				emoji: "👍",
+				emoji: "thumbsup",
 				commentId: "comment-uuid",
 				issueId: "issue-uuid",
 			},
@@ -365,7 +365,7 @@ describe("Linear webhook router", () => {
 		const posted = JSON.parse(init.body as string) as {
 			normalizedEvents: { kind: string; emoji: string }[];
 		};
-		expect(posted.normalizedEvents.some((e) => e.kind === "reaction" && e.emoji === "👍")).toBe(
+		expect(posted.normalizedEvents.some((e) => e.kind === "reaction" && e.emoji === "thumbsup")).toBe(
 			true,
 		);
 	});
@@ -377,7 +377,7 @@ describe("Linear webhook router", () => {
 			action: "create",
 			data: {
 				id: "reaction-uuid",
-				emoji: "🤖",
+				emoji: "robot_face",
 				commentId: "comment-uuid",
 				issueId: "issue-uuid",
 			},
@@ -404,7 +404,7 @@ describe("Linear webhook router", () => {
 		const posted = JSON.parse(init.body as string) as {
 			normalizedEvents: { kind: string; emoji: string }[];
 		};
-		expect(posted.normalizedEvents.some((e) => e.kind === "reaction" && e.emoji === "🤖")).toBe(
+		expect(posted.normalizedEvents.some((e) => e.kind === "reaction" && e.emoji === "robot_face")).toBe(
 			true,
 		);
 	});
@@ -421,7 +421,7 @@ describe("Linear webhook router", () => {
 			action: "create",
 			data: {
 				id: "reaction-uuid",
-				emoji: "🤖",
+				emoji: "robot_face",
 				commentId: "comment-uuid",
 				issueId: "issue-uuid",
 			},
@@ -461,7 +461,7 @@ describe("Linear webhook router", () => {
 			action: "create",
 			data: {
 				id: "reaction-uuid",
-				emoji: "❤️",
+				emoji: "heart",
 				commentId: "comment-uuid",
 				issueId: "issue-uuid",
 			},
@@ -652,7 +652,7 @@ describe("matchingProjects rule filter", () => {
 		const rules: RoutingRule[] = [
 			{
 				id: "scoped-emoji",
-				when: { type: "reactionWithEmoji", emoji: "👍" },
+				when: { type: "reactionWithEmoji", emoji: "thumbsup" },
 				matchingProjects: ["react-proj"],
 				targetEnvKey: "CURSOR_WEBHOOK_TEST_SCOPED",
 			},
@@ -662,7 +662,7 @@ describe("matchingProjects rule filter", () => {
 			action: "create",
 			data: {
 				id: "r1",
-				emoji: "👍",
+				emoji: "thumbsup",
 				commentId: "c1",
 				issueId: "i1",
 				comment: {

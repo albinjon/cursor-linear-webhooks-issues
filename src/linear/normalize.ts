@@ -1,5 +1,5 @@
 /**
- * Normalized events for routing (names for status/labels, exact string for emoji).
+ * Normalized events for routing (names for status/labels; reaction emoji is Linear’s shortcode string, e.g. `thumbsup`, `robot_face`).
  * Validation + branching via Zod union; domain rules live in small pure helpers.
  */
 

@@ -244,7 +244,7 @@ Rules are defined in code; **each rule reads one env var** for the destination U
 | `CURSOR_WEBHOOK_PLACEHOLDER_DONE`                  | Status **changes to** `Done`                                                           |
 | `CURSOR_WEBHOOK_PLACEHOLDER_LABEL_BLOCKED_REMOVED` | Label **Blocked** removed                                                              |
 | `CURSOR_WEBHOOK_PLACEHOLDER_COMMENT`               | **Comment** created                                                                    |
-| `CURSOR_WEBHOOK_PLACEHOLDER_REACTION_THUMBSUP`     | **👍** reaction **added** on a comment                                                 |
+| `CURSOR_WEBHOOK_PLACEHOLDER_REACTION_THUMBSUP`     | **`thumbsup`** reaction **added** on a comment (Linear shortcode, not Unicode)          |
 
 
 ### Secret
