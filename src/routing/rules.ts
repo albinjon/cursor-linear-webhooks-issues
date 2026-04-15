@@ -15,7 +15,7 @@ export const CURSOR_WEBHOOK_REVIEW_GATE_ENV_KEY =
 	"CURSOR_WEBHOOK_REVIEW_GATE" as const;
 
 
-const defaultProjects = ["v1", "FrontEnd", "Backend (Förbättringar)", ]
+const defaultProjects = ["v1", "FrontEnd", "Backend (Förbättringar)"];
 
 export const ROUTING_RULES: RoutingRule[] = [
 	{
@@ -48,7 +48,7 @@ export const ROUTING_RULES: RoutingRule[] = [
 	},
 	{
 		id: "reaction-robot-face",
-		when: { type: "reactionWithEmoji", emoji: ":robot_face:" },
+		when: { type: "reactionWithEmoji", emoji: "🤖" },
 		targetEnvKey: "CURSOR_WEBHOOK_BOT_ROUTING",
 		authTokenEnvKey: "CURSOR_WEBHOOK_BOT_ROUTING_AUTH_TOKEN",
 	},

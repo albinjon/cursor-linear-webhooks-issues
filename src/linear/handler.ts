@@ -50,15 +50,43 @@ export async function handleLinearWebhookPost(
 		return jsonResponse({ error: "webhook timestamp outside allowed window" }, 401);
 	}
 
+	const linearDelivery = request.headers.get("linear-delivery");
+	const linearEvent = request.headers.get("linear-event");
+
+	console.log(
+		JSON.stringify({
+			msg: "linear_webhook_payload",
+			linearDelivery,
+			linearEvent,
+			linearPayload: parsed,
+		}),
+	);
+
 	const events = normalizeLinearPayload(parsed);
+	if (events.length === 0) {
+		const top =
+			parsed !== null &&
+			typeof parsed === "object" &&
+			!Array.isArray(parsed)
+				? (parsed as Record<string, unknown>)
+				: null;
+		console.warn(
+			JSON.stringify({
+				msg: "linear_webhook_normalization_empty",
+				linearDelivery,
+				linearEvent,
+				payloadType: top?.type,
+				payloadAction: top?.action,
+				linearPayload: parsed,
+			}),
+		);
+	}
+
 	const matches = matchRoutes(
 		events,
 		ROUTING_RULES,
 		env as unknown as Record<string, string | undefined>,
 	);
-
-	const linearDelivery = request.headers.get("linear-delivery");
-	const linearEvent = request.headers.get("linear-event");
 
 	const routes = matches.map((m) => {
 		const body: DispatchPayload = {

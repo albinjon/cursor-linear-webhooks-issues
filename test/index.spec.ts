@@ -15,6 +15,9 @@ import type { RoutingRule } from "../src/routing/types";
 
 const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
 
+/** Matches `defaultProjects` in [src/routing/rules.ts](/src/routing/rules.ts) so project-scoped rules match in integration tests. */
+const TEST_PROJECT = { id: "v1", name: "Test project" } as const;
+
 describe("Linear webhook router", () => {
 	const fetchMock = vi.fn();
 
@@ -122,6 +125,7 @@ describe("Linear webhook router", () => {
 				state: { name: "Backlog" },
 				labelIds: [],
 				labels: [],
+				project: TEST_PROJECT,
 			},
 			updatedFrom: {
 				state: { name: "Todo" },
@@ -155,6 +159,7 @@ describe("Linear webhook router", () => {
 				state: { name: "Backlog" },
 				labelIds: [],
 				labels: [],
+				project: TEST_PROJECT,
 			},
 		};
 		const request = buildLinearWebhookRequest(
@@ -190,6 +195,7 @@ describe("Linear webhook router", () => {
 				id: "new-issue-uuid",
 				labelIds: [],
 				labels: [],
+				project: TEST_PROJECT,
 			},
 		};
 		const request = buildLinearWebhookRequest(
