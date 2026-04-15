@@ -127,9 +127,9 @@ Rules use **exact** workflow state **titles** (e.g. `"Todo"`, `"Review fixes"`).
 
 ### 2.3b Optional: limit a rule to certain Linear projects
 
-Each rule may set **`matchingProjects`**: a string array. When it is **non-empty**, that rule only matches events whose webhook payload includes a **project** whose **id**, **name**, **slug**, or **key** equals one of those strings (**exact** match, after trimming whitespace in the rule strings). If Linear does not send project fields on an event, a project-scoped rule will **not** match that event.
+Each rule may set `**matchingProjects`**: a string array. When it is **non-empty**, that rule only matches events whose webhook payload includes a **project** whose **id**, **name**, **slug**, or **key** equals one of those strings (**exact** match, after trimming whitespace in the rule strings). If Linear does not send project fields on an event, a project-scoped rule will **not** match that event.
 
-Omit **`matchingProjects`** to apply the rule to issues in **all** projects (same as today).
+Omit `**matchingProjects`** to apply the rule to issues in **all** projects (same as today).
 
 ### 2.4 Alignment with [Linear webhooks documentation](https://linear.app/developers/webhooks)
 

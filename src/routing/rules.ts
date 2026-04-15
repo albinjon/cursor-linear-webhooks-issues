@@ -14,30 +14,44 @@ import type { RoutingRule } from "./types";
 export const CURSOR_WEBHOOK_REVIEW_GATE_ENV_KEY =
 	"CURSOR_WEBHOOK_REVIEW_GATE" as const;
 
+
+const defaultProjects = ["v1", "FrontEnd", "Backend (Förbättringar)", ]
+
 export const ROUTING_RULES: RoutingRule[] = [
 	{
 		id: "refine-issues",
 		when: { type: "statusChangedTo", statusName: "Backlog" },
+		matchingProjects: defaultProjects,
 		targetEnvKey: "CURSOR_WEBHOOK_REFINE_ISSUES",
 		authTokenEnvKey: "CURSOR_WEBHOOK_REFINE_ISSUES_AUTH_TOKEN",
 	},
 	{
 		id: "implement-pr",
 		when: { type: "statusChangedTo", statusName: "Todo" },
+		matchingProjects: defaultProjects,
 		targetEnvKey: "CURSOR_WEBHOOK_IMPLEMENT_PR",
 		authTokenEnvKey: "CURSOR_WEBHOOK_IMPLEMENT_PR_AUTH_TOKEN",
 	},
 	{
 		id: "review-fixer",
 		when: { type: "statusChangedTo", statusName: "Review fixes" },
+		matchingProjects: defaultProjects,
 		targetEnvKey: "CURSOR_WEBHOOK_REVIEW_FIXER",
 		authTokenEnvKey: "CURSOR_WEBHOOK_REVIEW_FIXER_AUTH_TOKEN",
 	},
 	{
 		id: "issue-created",
 		when: { type: "issueCreated" },
+		matchingProjects: defaultProjects,
 		targetEnvKey: "CURSOR_WEBHOOK_PLACEHOLDER_ISSUE_CREATED",
 		authTokenEnvKey: "CURSOR_WEBHOOK_PLACEHOLDER_ISSUE_CREATED_AUTH_TOKEN",
+	},
+	{
+		id: "reaction-robot-face",
+		when: { type: "reactionWithEmoji", emoji: "🤖" },
+		matchingProjects: defaultProjects,
+		targetEnvKey: "CURSOR_WEBHOOK_BOT_ROUTING",
+		authTokenEnvKey: "CURSOR_WEBHOOK_BOT_ROUTING_AUTH_TOKEN",
 	},
 	{
 		id: "status-changed-to-done",
@@ -62,11 +76,5 @@ export const ROUTING_RULES: RoutingRule[] = [
 		when: { type: "reactionWithEmoji", emoji: "👍" },
 		targetEnvKey: "CURSOR_WEBHOOK_PLACEHOLDER_REACTION_THUMBSUP",
 		authTokenEnvKey: "CURSOR_WEBHOOK_PLACEHOLDER_REACTION_THUMBSUP_AUTH_TOKEN",
-	},
-	{
-		id: "reaction-robot-face",
-		when: { type: "reactionWithEmoji", emoji: "🤖" },
-		targetEnvKey: "CURSOR_WEBHOOK_BOT_ROUTING",
-		authTokenEnvKey: "CURSOR_WEBHOOK_BOT_ROUTING_AUTH_TOKEN",
 	},
 ];
