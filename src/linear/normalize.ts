@@ -160,7 +160,16 @@ function eventsFromIssueStatus(
 	data: IssueData,
 	updatedFrom: UpdatedFrom | null | undefined,
 ): NormalizedEvent[] {
-	const prev = readStateName(updatedFrom?.state);
+	// Issue updates often include full `data.state` without `updatedFrom.state` (e.g. activity-only
+	// refreshes when adding a reaction). Treating missing `updatedFrom.state` as previous=null would
+	// falsely emit a transition into the current column; require an explicit `state` field to compare.
+	if (
+		updatedFrom == null ||
+		!Object.prototype.hasOwnProperty.call(updatedFrom, "state")
+	) {
+		return [];
+	}
+	const prev = readStateName(updatedFrom.state);
 	const next = readStateName(data.state);
 	if (next !== null && prev !== next) {
 		return [

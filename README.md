@@ -216,6 +216,8 @@ The Worker sends:
 
 If the create payload has **no** workflow state name (missing `state` or empty name), routing falls back to the `**issue-created`** rule and `normalizedEvents` contains `kind: "issueCreated"` only.
 
+**Issue update and status:** For `**Issue` + `update`**, a `statusChanged` normalized event is emitted only when the payload includes **`updatedFrom` with a `state` property** (so previous workflow state can be compared to `data.state`). If Linear omits that (common on activity-only updates, e.g. after a reaction), the Worker does **not** treat `data.state` alone as a transition into the current column, so `**statusChangedTo`** rules do not fire spuriously.
+
 **Reactions:** entries with `kind: "reaction"` use Linear’s emoji **shortcode** string (e.g. `thumbsup`, `robot_face`), not Unicode. The payload may include **`commentId`**, **`issueId`**, or **both**; some webhooks only include **`issueId`** (issue-level reaction with no comment). Cursor automations should treat `commentId` as optional when branching on reactions.
 
 Your Cursor automation should read this body as needed (often `linearPayload` plus `ruleId`).

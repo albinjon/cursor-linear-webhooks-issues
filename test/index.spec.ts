@@ -577,6 +577,65 @@ describe("Linear webhook router", () => {
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
 
+	it("does not emit statusChanged for Issue update when updatedFrom omits state", () => {
+		const withoutUpdatedFrom = normalizeLinearPayload({
+			type: "Issue",
+			action: "update",
+			data: {
+				id: "issue-uuid",
+				state: { name: "Todo" },
+				labelIds: [],
+				labels: [],
+			},
+		});
+		expect(
+			withoutUpdatedFrom.filter((e) => e.kind === "statusChanged"),
+		).toEqual([]);
+
+		const labelIdsOnly = normalizeLinearPayload({
+			type: "Issue",
+			action: "update",
+			data: {
+				id: "issue-uuid",
+				state: { name: "Backlog" },
+				labelIds: [],
+				labels: [],
+			},
+			updatedFrom: { labelIds: [] },
+		});
+		expect(labelIdsOnly.filter((e) => e.kind === "statusChanged")).toEqual([]);
+	});
+
+	it("does not dispatch status webhooks for Issue update without updatedFrom.state", async () => {
+		const payload = {
+			webhookTimestamp: Date.now(),
+			type: "Issue",
+			action: "update",
+			data: {
+				id: "issue-uuid",
+				state: { name: "Todo" },
+				labelIds: [],
+				labels: [],
+			},
+		};
+		const request = buildLinearWebhookRequest(
+			"https://example.com/webhooks/linear",
+			payload,
+			{ "Linear-Event": "Issue" },
+		);
+		const ctx = createExecutionContext();
+		const response = await worker.fetch(request, env, ctx);
+		await waitOnExecutionContext(ctx);
+		expect(response.status).toBe(200);
+		const body = (await response.json()) as {
+			matchedRules: string[];
+			dispatchResults: unknown[];
+		};
+		expect(body.matchedRules).toEqual([]);
+		expect(body.dispatchResults).toEqual([]);
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
 	it("returns 400 for invalid JSON body", async () => {
 		const raw = "{ not json";
 		const request = new IncomingRequest("https://example.com/webhooks/linear", {
