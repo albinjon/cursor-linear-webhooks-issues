@@ -13,7 +13,34 @@
 	"upload_source_maps": true,
 	"compatibility_flags": [
 		"nodejs_compat"
-	]
+	],
+	"env": {
+		"test": {
+			"vars": {
+				"LINEAR_WEBHOOK_SECRET": "test-secret",
+				"LINEAR_REPLAY_WINDOW_MS": "600000",
+				"CURSOR_WEBHOOK_REFINE_ISSUES": "https://cursor.test/hooks/refine-issues",
+				"CURSOR_WEBHOOK_REFINE_ISSUES_AUTH_TOKEN": "test-token-refine-issues",
+				"CURSOR_WEBHOOK_IMPLEMENT_PR": "https://cursor.test/hooks/implement-pr",
+				"CURSOR_WEBHOOK_IMPLEMENT_PR_AUTH_TOKEN": "test-token-implement-pr",
+				"CURSOR_WEBHOOK_REVIEW_FIXER": "https://cursor.test/hooks/review-fixer",
+				"CURSOR_WEBHOOK_REVIEW_FIXER_AUTH_TOKEN": "test-token-review-fixer",
+				"CURSOR_WEBHOOK_REVIEW_GATE": "https://cursor.test/placeholder/review-gate",
+				"CURSOR_WEBHOOK_PLACEHOLDER_ISSUE_CREATED": "https://cursor.test/hooks/placeholder-issue-created",
+				"CURSOR_WEBHOOK_PLACEHOLDER_ISSUE_CREATED_AUTH_TOKEN": "test-token-issue-created",
+				"CURSOR_WEBHOOK_PLACEHOLDER_DONE": "https://cursor.test/hooks/placeholder-done",
+				"CURSOR_WEBHOOK_PLACEHOLDER_DONE_AUTH_TOKEN": "test-token-done",
+				"CURSOR_WEBHOOK_PLACEHOLDER_LABEL_BLOCKED_REMOVED": "https://cursor.test/hooks/placeholder-label",
+				"CURSOR_WEBHOOK_PLACEHOLDER_LABEL_BLOCKED_REMOVED_AUTH_TOKEN": "test-token-label-removed",
+				"CURSOR_WEBHOOK_PLACEHOLDER_COMMENT": "https://cursor.test/hooks/placeholder-comment",
+				"CURSOR_WEBHOOK_PLACEHOLDER_COMMENT_AUTH_TOKEN": "test-token-comment",
+				"CURSOR_WEBHOOK_PLACEHOLDER_REACTION_THUMBSUP": "https://cursor.test/hooks/placeholder-reaction",
+				"CURSOR_WEBHOOK_PLACEHOLDER_REACTION_THUMBSUP_AUTH_TOKEN": "test-token-reaction-thumbsup",
+				"CURSOR_WEBHOOK_BOT_ROUTING": "https://cursor.test/hooks/placeholder-reaction-robot-face",
+				"CURSOR_WEBHOOK_BOT_ROUTING_AUTH_TOKEN": "test-token-bot-routing"
+			}
+		}
+	}
 	/**
 	 * Smart Placement
 	 * https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement

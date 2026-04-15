@@ -1,0 +1,395 @@
+/**
+ * Normalized events for routing (names for status/labels, exact string for emoji).
+ * Validation + branching via Zod union; domain rules live in small pure helpers.
+ */
+
+import { z } from "zod";
+
+export type NormalizedEvent =
+	| {
+			kind: "statusChanged";
+			issueId: string;
+			previousStatusName: string | null;
+			newStatusName: string;
+			/** Project id / name / slug / key from the webhook when present (for `matchingProjects` rules). */
+			projectIdents?: string[];
+	  }
+	| {
+			kind: "labelRemoved";
+			issueId: string;
+			removedLabelNames: string[];
+			projectIdents?: string[];
+	  }
+	| {
+			kind: "commentAdded";
+			issueId: string;
+			commentId: string;
+			body?: string;
+			projectIdents?: string[];
+	  }
+	| {
+			kind: "reaction";
+			emoji: string;
+			commentId: string;
+			issueId?: string;
+			reactionAction: "create" | "remove";
+			projectIdents?: string[];
+	  }
+	| {
+			kind: "issueCreated";
+			issueId: string;
+			projectIdents?: string[];
+	  };
+
+/** Distinct non-empty project id, name, slug, or key strings from a Linear entity payload. */
+function projectIdentsFromRecord(data: Record<string, unknown>): string[] {
+	const out: string[] = [];
+	const add = (s: unknown) => {
+		if (typeof s === "string" && s.length > 0) out.push(s);
+	};
+	add(data.projectId);
+	const proj = data.project;
+	if (proj && typeof proj === "object" && proj !== null) {
+		const p = proj as Record<string, unknown>;
+		add(p.id);
+		add(p.name);
+		add(p.slug);
+		add(p.key);
+	}
+	return [...new Set(out)];
+}
+
+function mapWithProjectIdents(
+	evs: NormalizedEvent[],
+	idents: string[],
+): NormalizedEvent[] {
+	if (!idents.length) return evs;
+	return evs.map((ev) => ({ ...ev, projectIdents: idents }));
+}
+
+const stateRefSchema = z
+	.object({
+		name: z.string().nullish(),
+	})
+	.passthrough();
+
+const issueDataSchema = z
+	.object({
+		id: z.string(),
+		state: stateRefSchema.nullish(),
+		labelIds: z.array(z.string()).nullish(),
+		labels: z
+			.array(
+				z
+					.object({
+						id: z.string(),
+						name: z.string().nullish(),
+					})
+					.passthrough(),
+			)
+			.nullish(),
+	})
+	.passthrough();
+
+type IssueData = z.infer<typeof issueDataSchema>;
+
+function projectIdentsFromIssueData(data: IssueData): string[] {
+	return projectIdentsFromRecord(data as unknown as Record<string, unknown>);
+}
+
+function mergeProjectIdents(...groups: string[][]): string[] {
+	return [...new Set(groups.flat())];
+}
+
+function projectIdentsFromCommentData(data: Record<string, unknown>): string[] {
+	const direct = projectIdentsFromRecord(data);
+	const issue = data.issue;
+	if (issue && typeof issue === "object") {
+		return mergeProjectIdents(
+			direct,
+			projectIdentsFromRecord(issue as Record<string, unknown>),
+		);
+	}
+	return direct;
+}
+
+function projectIdentsFromIssueLabelData(data: Record<string, unknown>): string[] {
+	const direct = projectIdentsFromRecord(data);
+	const issue = data.issue;
+	if (issue && typeof issue === "object") {
+		return mergeProjectIdents(
+			direct,
+			projectIdentsFromRecord(issue as Record<string, unknown>),
+		);
+	}
+	return direct;
+}
+
+const updatedFromSchema = z
+	.object({
+		state: stateRefSchema.nullish().optional(),
+		labelIds: z.array(z.string()).optional(),
+	})
+	.passthrough();
+
+type UpdatedFrom = z.infer<typeof updatedFromSchema>;
+
+function readStateName(
+	state: { name?: string | null } | null | undefined,
+): string | null {
+	const n = state?.name;
+	return typeof n === "string" ? n : null;
+}
+
+function buildLabelIdToName(data: IssueData): Map<string, string> {
+	const map = new Map<string, string>();
+	if (!data.labels) return map;
+	for (const l of data.labels) {
+		if (l.name && l.name.length) map.set(l.id, l.name);
+	}
+	return map;
+}
+
+function eventsFromIssueStatus(
+	data: IssueData,
+	updatedFrom: UpdatedFrom | null | undefined,
+): NormalizedEvent[] {
+	const prev = readStateName(updatedFrom?.state);
+	const next = readStateName(data.state);
+	if (next !== null && prev !== next) {
+		return [
+			{
+				kind: "statusChanged",
+				issueId: data.id,
+				previousStatusName: prev,
+				newStatusName: next,
+			},
+		];
+	}
+	return [];
+}
+
+function eventsFromIssueLabels(
+	data: IssueData,
+	updatedFrom: UpdatedFrom | null | undefined,
+): NormalizedEvent[] {
+	const idToName = buildLabelIdToName(data);
+	const currentIds = new Set(data.labelIds ?? []);
+	const prevIds = updatedFrom?.labelIds ?? [];
+	const removedIds = prevIds.filter((id) => !currentIds.has(id));
+	const removedLabelNames = removedIds
+		.map((id) => idToName.get(id))
+		.filter((n): n is string => !!n);
+	if (!removedLabelNames.length) return [];
+	return [
+		{
+			kind: "labelRemoved",
+			issueId: data.id,
+			removedLabelNames,
+		},
+	];
+}
+
+const commentCreateWebhook = z
+	.object({
+		type: z.literal("Comment"),
+		action: z.literal("create"),
+		data: z
+			.object({
+				id: z.string(),
+				issueId: z.string(),
+				body: z.string().nullish(),
+			})
+			.passthrough(),
+	})
+	.transform(({ data }) => {
+		const idents = projectIdentsFromCommentData(
+			data as unknown as Record<string, unknown>,
+		);
+		const ev: NormalizedEvent = {
+			kind: "commentAdded",
+			issueId: data.issueId,
+			commentId: data.id,
+			body: data.body ?? undefined,
+		};
+		return mapWithProjectIdents([ev], idents);
+	});
+
+const issueCreateWebhook = z
+	.object({
+		type: z.literal("Issue"),
+		action: z.literal("create"),
+		data: issueDataSchema,
+	})
+	.transform(({ data }) => {
+		const idents = projectIdentsFromIssueData(data);
+		const initialStatus = readStateName(data.state);
+		if (initialStatus !== null) {
+			const ev: NormalizedEvent = {
+				kind: "statusChanged",
+				issueId: data.id,
+				previousStatusName: null,
+				newStatusName: initialStatus,
+			};
+			return mapWithProjectIdents([ev], idents);
+		}
+		const created: NormalizedEvent = { kind: "issueCreated", issueId: data.id };
+		return mapWithProjectIdents([created], idents);
+	});
+
+const issueUpdateWebhook = z
+	.object({
+		type: z.literal("Issue"),
+		action: z.literal("update"),
+		data: issueDataSchema,
+		updatedFrom: updatedFromSchema.nullish(),
+	})
+	.transform(({ data, updatedFrom }) => {
+		const idents = projectIdentsFromIssueData(data);
+		return mapWithProjectIdents(
+			[
+				...eventsFromIssueStatus(data, updatedFrom ?? undefined),
+				...eventsFromIssueLabels(data, updatedFrom ?? undefined),
+			],
+			idents,
+		);
+	});
+
+const issueLabelRemoveWebhook = z
+	.object({
+		type: z.literal("IssueLabel"),
+		action: z.literal("remove"),
+		data: z
+			.object({
+				issueId: z.string(),
+				label: z
+					.object({
+						name: z.string(),
+					})
+					.passthrough(),
+			})
+			.passthrough(),
+	})
+	.transform(({ data }) => {
+		const idents = projectIdentsFromIssueLabelData(
+			data as unknown as Record<string, unknown>,
+		);
+		const ev: NormalizedEvent = {
+			kind: "labelRemoved",
+			issueId: data.issueId,
+			removedLabelNames: [data.label.name],
+		};
+		return mapWithProjectIdents([ev], idents);
+	});
+
+/** Linear `Reaction` entity — emoji on a comment (shape may include nested `comment`). */
+const reactionDataSchema = z
+	.object({
+		id: z.string(),
+		emoji: z.string(),
+		commentId: z.string().nullish(),
+		issueId: z.string().nullish(),
+		comment: z
+			.object({
+				id: z.string().optional(),
+				issueId: z.string().nullish(),
+				issue: z
+					.object({
+						id: z.string(),
+					})
+					.passthrough()
+					.optional(),
+			})
+			.passthrough()
+			.nullish(),
+	})
+	.passthrough();
+
+type ReactionData = z.infer<typeof reactionDataSchema>;
+
+function commentIdFromReaction(data: ReactionData): string | undefined {
+	if (typeof data.commentId === "string" && data.commentId.length) {
+		return data.commentId;
+	}
+	const c = data.comment;
+	if (c && typeof c.id === "string" && c.id.length) return c.id;
+	return undefined;
+}
+
+function issueIdFromReaction(data: ReactionData): string | undefined {
+	if (typeof data.issueId === "string" && data.issueId.length) {
+		return data.issueId;
+	}
+	const c = data.comment;
+	if (!c) return undefined;
+	if (typeof c.issueId === "string" && c.issueId.length) return c.issueId;
+	const issue = c.issue;
+	if (issue && typeof issue.id === "string") return issue.id;
+	return undefined;
+}
+
+function projectIdentsFromReactionData(data: ReactionData): string[] {
+	const c = data.comment;
+	if (!c?.issue || typeof c.issue !== "object") return [];
+	return projectIdentsFromRecord(c.issue as Record<string, unknown>);
+}
+
+function reactionEvents(
+	data: ReactionData,
+	reactionAction: "create" | "remove",
+): NormalizedEvent[] {
+	const commentId = commentIdFromReaction(data);
+	if (!commentId) return [];
+	const issueId = issueIdFromReaction(data);
+	const idents = projectIdentsFromReactionData(data);
+	const ev: NormalizedEvent =
+		issueId !== undefined
+			? {
+					kind: "reaction",
+					emoji: data.emoji,
+					commentId,
+					issueId,
+					reactionAction,
+				}
+			: {
+					kind: "reaction",
+					emoji: data.emoji,
+					commentId,
+					reactionAction,
+				};
+	return mapWithProjectIdents([ev], idents);
+}
+
+const reactionCreateWebhook = z
+	.object({
+		type: z.literal("Reaction"),
+		action: z.literal("create"),
+		data: reactionDataSchema,
+	})
+	.transform(({ data }) => reactionEvents(data, "create"));
+
+const reactionRemoveWebhook = z
+	.object({
+		type: z.literal("Reaction"),
+		action: z.literal("remove"),
+		data: reactionDataSchema,
+	})
+	.transform(({ data }) => reactionEvents(data, "remove"));
+
+const linearDataChangeWebhook = z.union([
+	commentCreateWebhook,
+	issueCreateWebhook,
+	issueUpdateWebhook,
+	issueLabelRemoveWebhook,
+	reactionCreateWebhook,
+	reactionRemoveWebhook,
+]);
+
+/**
+ * Derives zero or more normalized events from a Linear data-change webhook body.
+ * Unknown or non-matching shapes yield an empty array (no throw).
+ */
+export function normalizeLinearPayload(payload: unknown): NormalizedEvent[] {
+	const r = linearDataChangeWebhook.safeParse(payload);
+	return r.success ? r.data : [];
+}
