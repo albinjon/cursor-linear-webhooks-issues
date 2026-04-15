@@ -61,6 +61,29 @@ const issueProjectGraphqlResponseSchema = z.object({
 	errors: z.array(z.object({ message: z.string() })).optional(),
 });
 
+const BODY_PREVIEW_MAX = 200;
+
+type GraphqlIssueProjectFailurePhase =
+	| "http_error"
+	| "json_parse"
+	| "schema"
+	| "graphql_errors";
+
+function logGraphqlIssueProjectFailure(
+	issueId: string,
+	phase: GraphqlIssueProjectFailurePhase,
+	extra: Record<string, unknown> = {},
+): void {
+	console.warn(
+		JSON.stringify({
+			msg: "linear_graphql_issue_project_failed",
+			phase,
+			issueId,
+			...extra,
+		}),
+	);
+}
+
 async function fetchProjectIdentsForIssue(
 	issueId: string,
 	apiKey: string,
@@ -77,17 +100,50 @@ async function fetchProjectIdentsForIssue(
 			variables: { issueId },
 		}),
 	});
-	if (!res.ok) return [];
+
+	if (!res.ok) {
+		let bodyPreview: string | undefined;
+		try {
+			const t = await res.text();
+			bodyPreview =
+				t.length > BODY_PREVIEW_MAX
+					? `${t.slice(0, BODY_PREVIEW_MAX)}…`
+					: t;
+		} catch {
+			bodyPreview = undefined;
+		}
+		logGraphqlIssueProjectFailure(issueId, "http_error", {
+			status: res.status,
+			statusText: res.statusText,
+			...(bodyPreview !== undefined ? { bodyPreview } : {}),
+		});
+		return [];
+	}
+
 	let json: unknown;
 	try {
 		json = await res.json();
 	} catch {
+		logGraphqlIssueProjectFailure(issueId, "json_parse");
 		return [];
 	}
+
 	const parsed = issueProjectGraphqlResponseSchema.safeParse(json);
-	if (!parsed.success) return [];
+	if (!parsed.success) {
+		logGraphqlIssueProjectFailure(issueId, "schema", {
+			zodIssues: parsed.error.issues.slice(0, 8),
+		});
+		return [];
+	}
+
 	const body = parsed.data;
-	if (body.errors?.length) return [];
+	if (body.errors?.length) {
+		logGraphqlIssueProjectFailure(issueId, "graphql_errors", {
+			errors: body.errors,
+		});
+		return [];
+	}
+
 	const proj = body.data?.issue?.project;
 	return projectIdentsFromGraphqlProject(proj ?? null);
 }
