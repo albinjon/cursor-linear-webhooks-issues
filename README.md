@@ -59,7 +59,7 @@ Paste the **signing secret** from Linear (see [Linear (section 2)](#2-linear) be
 
 ### 1.3 Linear API key (recommended for `matchingProjects` rules)
 
-Rules with **`matchingProjects`** compare against project **id**, **name**, **slug**, or **key**. Linear webhooks often **do not** include `project` on the payload; this Worker loads **`Issue.project`** from Linear’s **GraphQL API** using a **Personal API Key** or OAuth token.
+Rules with **`matchingProjects`** compare against project **id**, **name**, **slug**, or **key** (not GraphQL **`slugId`**, which is often opaque). Linear webhooks often **do not** include `project` on the payload; this Worker loads **`Issue.project`** from Linear’s **GraphQL API** using a **Personal API Key** or OAuth token.
 
 ```bash
 npx wrangler secret put LINEAR_API_KEY
@@ -137,7 +137,7 @@ Rules use **exact** workflow state **titles** (e.g. `"Todo"`, `"Review fixes"`).
 
 ### 2.3b Optional: limit a rule to certain Linear projects
 
-Each rule may set `**matchingProjects`**: a string array. When it is **non-empty**, that rule only matches events whose webhook payload includes a **project** whose **id**, **name**, **slug**, or **key** equals one of those strings (**exact** match, after trimming whitespace in the rule strings). If Linear does not send project fields on an event, a project-scoped rule will **not** match that event.
+Each rule may set `**matchingProjects`**: a string array. When it is **non-empty**, that rule only matches events whose webhook payload includes a **project** whose **id**, **name**, **slug**, or **key** equals one of those strings (**exact** match, after trimming whitespace in the rule strings). **`slugId` is not used** for matching. If Linear does not send project fields on an event, a project-scoped rule will **not** match that event.
 
 Omit `**matchingProjects`** to apply the rule to issues in **all** projects (same as today).
 

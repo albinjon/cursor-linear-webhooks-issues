@@ -1,11 +1,11 @@
 import { z } from "zod";
 
-/** Nested Linear `Project` fields used for routing identifiers (id, name, slugId, slug, key). */
+/** Nested Linear `Project` fields for parsing; routing uses id, name, slug, and key — not `slugId`. */
 export const projectLikeSchema = z
 	.object({
 		id: z.string().optional(),
 		name: z.string().nullish(),
-		/** GraphQL `Project.slugId` (human-readable slug); webhooks may still send legacy `slug`. */
+		/** Ignored for matchingProjects (opaque in GraphQL); kept for payload compatibility. */
 		slugId: z.string().nullish(),
 		slug: z.string().nullish(),
 		key: z.string().nullish(),

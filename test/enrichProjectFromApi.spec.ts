@@ -87,7 +87,7 @@ describe("enrichProjectFromApi", () => {
 					data: {
 						issue: {
 							id: "issue-1",
-							project: { id: "v1", name: "P", slugId: "v1" },
+							project: { id: "v1", name: "P" },
 						},
 					},
 				}),
@@ -138,7 +138,7 @@ describe("enrichProjectFromApi", () => {
 					data: {
 						issue: {
 							id: "issue-1",
-							project: { id: "proj-id", name: "P", slugId: "v1" },
+							project: { id: "proj-id", name: "v1" },
 						},
 					},
 				}),
@@ -167,14 +167,13 @@ describe("enrichProjectFromApi", () => {
 		const payload = JSON.parse(okLog as string) as {
 			msg: string;
 			issueId: string;
-			graphqlProject: { id: string; name: string; slugId: string };
+			graphqlProject: { id: string; name: string };
 			projectIdents: string[];
 		};
 		expect(payload.issueId).toBe("issue-1");
 		expect(payload.graphqlProject).toEqual({
 			id: "proj-id",
-			name: "P",
-			slugId: "v1",
+			name: "v1",
 		});
 		expect(payload.projectIdents).toContain("proj-id");
 		expect(payload.projectIdents).toContain("v1");

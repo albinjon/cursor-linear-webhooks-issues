@@ -16,7 +16,6 @@ const ISSUE_PROJECT_QUERY = `query IssueProjectForRouting($issueId: String!) {
 		project {
 			id
 			name
-			slugId
 		}
 	}
 }`;
@@ -32,10 +31,10 @@ function projectIdentsFromGraphqlProject(
 ): string[] {
 	if (!project) return [];
 	const out: string[] = [];
+	// Omit slugId: GraphQL often returns an opaque token; matchingProjects uses name (and id, slug, key).
 	for (const v of [
 		project.id,
 		project.name,
-		project.slugId,
 		project.slug,
 		project.key,
 	]) {
@@ -158,7 +157,6 @@ async function fetchProjectIdentsForIssue(
 					? { id: proj.id }
 					: {}),
 				...(proj.name != null ? { name: proj.name } : {}),
-				...(proj.slugId != null ? { slugId: proj.slugId } : {}),
 			}
 		: null;
 	console.log(
@@ -181,7 +179,7 @@ function mergeIdents(
 
 /**
  * When rules use matchingProjects and events lack projectIdents (typical for webhooks),
- * loads each issue's project via Linear GraphQL and merges id, name, slugId (and legacy slug/key) into projectIdents.
+ * loads each issue's project via Linear GraphQL and merges id, name (and legacy slug/key) into projectIdents.
  * No-op if LINEAR_API_KEY is missing, no rules need projects, or all events already have idents.
  */
 export async function enrichNormalizedEventsWithLinearProjects(
