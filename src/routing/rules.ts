@@ -49,7 +49,6 @@ export const ROUTING_RULES: RoutingRule[] = [
 	{
 		id: "reaction-robot-face",
 		when: { type: "reactionWithEmoji", emoji: "🤖" },
-		matchingProjects: defaultProjects,
 		targetEnvKey: "CURSOR_WEBHOOK_BOT_ROUTING",
 		authTokenEnvKey: "CURSOR_WEBHOOK_BOT_ROUTING_AUTH_TOKEN",
 	},
