@@ -18,6 +18,7 @@
 		"test": {
 			"vars": {
 				"LINEAR_WEBHOOK_SECRET": "test-secret",
+				"LINEAR_API_KEY": "test-linear-api-key",
 				"LINEAR_REPLAY_WINDOW_MS": "600000",
 				"CURSOR_WEBHOOK_REFINE_ISSUES": "https://cursor.test/hooks/refine-issues",
 				"CURSOR_WEBHOOK_REFINE_ISSUES_AUTH_TOKEN": "test-token-refine-issues",

@@ -17,7 +17,9 @@ export interface RoutingRule {
 	when: RuleCondition;
 	/**
 	 * When set (non-empty), the rule only matches if the event’s project matches one of
-	 * these strings exactly (against project id, name, slug, or key when Linear sends them).
+	 * these strings exactly (against project id, name, slug, or key).
+	 * Webhooks often omit project; the Worker may fill `projectIdents` via Linear GraphQL
+	 * (`LINEAR_API_KEY`). If identifiers are still empty, the project filter is skipped (fail-open).
 	 * Omitted or empty = no project filter.
 	 */
 	matchingProjects?: string[];

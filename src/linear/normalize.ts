@@ -11,7 +11,7 @@ export type NormalizedEvent =
 			issueId: string;
 			previousStatusName: string | null;
 			newStatusName: string;
-			/** Project id / name / slug / key from the webhook when present (for `matchingProjects` rules). */
+			/** Project id / name / slug / key from the webhook and/or GraphQL enrichment (for `matchingProjects`). */
 			projectIdents?: string[];
 	  }
 	| {

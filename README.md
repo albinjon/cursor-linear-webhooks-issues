@@ -57,7 +57,17 @@ Paste the **signing secret** from Linear (see [Linear (section 2)](#2-linear) be
 
 **Workers & Pages** → your Worker → **Settings** → **Variables and Secrets** → **Add** → type **Secret** → name `LINEAR_WEBHOOK_SECRET`.
 
-### 1.3 Set Cursor destination URLs and auth tokens (per automation)
+### 1.3 Linear API key (recommended for `matchingProjects` rules)
+
+Rules with **`matchingProjects`** compare against project **id**, **name**, **slug**, or **key**. Linear webhooks often **do not** include `project` on the payload; this Worker loads **`Issue.project`** from Linear’s **GraphQL API** using a **Personal API Key** or OAuth token.
+
+```bash
+npx wrangler secret put LINEAR_API_KEY
+```
+
+Paste a key from **Linear** → **Settings** → **Account** → **API** → **Personal API keys** (or your OAuth app). If `LINEAR_API_KEY` is missing or a request fails, project-scoped rules still run when no project identifiers are available (**fail-open**); see [`src/routing/match.ts`](src/routing/match.ts).
+
+### 1.4 Set Cursor destination URLs and auth tokens (per automation)
 
 Each automation can use:
 
@@ -81,7 +91,7 @@ Each automation can use:
 If the URL variable is **missing** or **empty**, that rule is skipped.
 If an auth token variable is **missing** or **empty**, dispatch still proceeds **without** an `Authorization` header (fail-open) and logs a warning.
 
-### 1.4 Optional: replay window
+### 1.5 Optional: replay window
 
 
 | Variable                  | Default | Purpose                                                                                                                          |
@@ -89,7 +99,7 @@ If an auth token variable is **missing** or **empty**, dispatch still proceeds *
 | `LINEAR_REPLAY_WINDOW_MS` | `60000` | Reject webhooks whose `webhookTimestamp` is older than this many ms (replay protection). Set as a **plain** var if you override. |
 
 
-### 1.5 After changing bindings or `vars` in `wrangler.jsonc`
+### 1.6 After changing bindings or `vars` in `wrangler.jsonc`
 
 Regenerate TypeScript types:
 
@@ -243,6 +253,7 @@ Rules are defined in code; **each rule reads one env var** for the destination U
 | Name                          | Set via                                       |
 | ----------------------------- | --------------------------------------------- |
 | `LINEAR_WEBHOOK_SECRET`       | `wrangler secret put` or dashboard **Secret** |
+| `LINEAR_API_KEY`              | `wrangler secret put` or dashboard **Secret** (optional; for `matchingProjects` via GraphQL) |
 | `CURSOR_WEBHOOK_*_AUTH_TOKEN` | `wrangler secret put` or dashboard **Secret** |
 
 
@@ -276,6 +287,7 @@ Create `**.dev.vars`** in the project root (gitignored):
 
 ```bash
 LINEAR_WEBHOOK_SECRET=your-test-secret
+LINEAR_API_KEY=your-linear-personal-api-key
 CURSOR_WEBHOOK_REFINE_ISSUES=https://example.com
 CURSOR_WEBHOOK_REFINE_ISSUES_AUTH_TOKEN=local-dev-token
 # ...other CURSOR_* as needed

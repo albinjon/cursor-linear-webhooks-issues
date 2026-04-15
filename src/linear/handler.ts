@@ -1,4 +1,5 @@
 import { dispatchToCursorWebhooks, type DispatchPayload } from "../cursor/dispatch";
+import { enrichNormalizedEventsWithLinearProjects } from "./enrichProjectFromApi";
 import { normalizeLinearPayload } from "./normalize";
 import { ROUTING_RULES } from "../routing/rules";
 import { matchRoutes } from "../routing/match";
@@ -62,7 +63,12 @@ export async function handleLinearWebhookPost(
 		}),
 	);
 
-	const events = normalizeLinearPayload(parsed);
+	let events = normalizeLinearPayload(parsed);
+	events = await enrichNormalizedEventsWithLinearProjects(
+		events,
+		ROUTING_RULES,
+		env,
+	);
 	if (events.length === 0) {
 		const top =
 			parsed !== null &&

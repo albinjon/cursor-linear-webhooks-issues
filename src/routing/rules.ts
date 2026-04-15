@@ -6,8 +6,12 @@ import type { RoutingRule } from "./types";
  * Status names must match your Linear workflow state **titles** exactly (case-sensitive).
  *
  * Optional **`matchingProjects`**: string array; when non-empty, the rule only runs if the
- * webhook payload includes a Linear **project** whose id, name, slug, or key equals one of
- * those strings (exact match). Omit or leave empty to apply the rule to all projects.
+ * normalized event’s **project** identifiers (from the webhook and/or Linear GraphQL enrichment)
+ * include one of these strings (exact match). If no identifiers are available, the filter is
+ * skipped (fail-open). Omit or leave empty to apply the rule to all projects.
+ *
+ * Set secret **`LINEAR_API_KEY`** so the Worker can resolve `Issue.project` when webhooks do not
+ * include project fields (see README).
  */
 
 /** **Review Gate** — no Linear route in this worker; set in the dashboard only if you use this URL outside this router. */

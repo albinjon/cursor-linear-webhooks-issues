@@ -15,14 +15,64 @@ import type { RoutingRule } from "../src/routing/types";
 
 const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
 
-/** Matches `defaultProjects` in [src/routing/rules.ts](/src/routing/rules.ts) so project-scoped rules match in integration tests. */
-const TEST_PROJECT = { id: "v1", name: "Test project" } as const;
+function urlOfFetchArg(u: RequestInfo | URL): string {
+	if (typeof u === "string") return u;
+	if (u instanceof URL) return u.href;
+	return (u as Request).url;
+}
+
+/** First outbound call to a Cursor test webhook (skips Linear GraphQL enrichment calls). */
+function firstCursorFetchCall(
+	calls: unknown[][],
+): [RequestInfo | URL, RequestInit | undefined] | undefined {
+	const hit = calls.find(([input]) =>
+		urlOfFetchArg(input as RequestInfo | URL).includes("cursor.test"),
+	);
+	return hit as [RequestInfo | URL, RequestInit | undefined] | undefined;
+}
 
 describe("Linear webhook router", () => {
 	const fetchMock = vi.fn();
 
 	beforeEach(() => {
-		fetchMock.mockImplementation(async () => new Response("ok", { status: 200 }));
+		fetchMock.mockImplementation(
+			async (input: RequestInfo | URL, init?: RequestInit) => {
+				const url = urlOfFetchArg(input);
+				if (url.includes("api.linear.app/graphql")) {
+					let issueId = "";
+					try {
+						const body =
+							init?.body && typeof init.body === "string"
+								? (JSON.parse(init.body) as {
+										variables?: { issueId?: string };
+									})
+								: {};
+						issueId = body.variables?.issueId ?? "";
+					} catch {
+						issueId = "";
+					}
+					const project =
+						issueId.includes("wrong-proj-issue") || issueId === "other-issue-uuid"
+							? { id: "other-proj", name: "Beta", slug: "beta" }
+							: { id: "v1", name: "Test project", slug: "v1" };
+					return new Response(
+						JSON.stringify({
+							data: {
+								issue: {
+									id: issueId || "issue-uuid",
+									project,
+								},
+							},
+						}),
+						{
+							status: 200,
+							headers: { "Content-Type": "application/json" },
+						},
+					);
+				}
+				return new Response("ok", { status: 200 });
+			},
+		);
 		vi.stubGlobal("fetch", fetchMock);
 	});
 
@@ -99,10 +149,10 @@ describe("Linear webhook router", () => {
 		expect(body.matchedRules).toContain("status-changed-to-done");
 		expect(body.dispatchResults).toHaveLength(1);
 		expect(body.dispatchResults[0]?.ok).toBe(true);
-		expect(fetchMock).toHaveBeenCalledTimes(1);
-		const firstCall = fetchMock.mock.calls[0];
-		expect(firstCall?.[0]).toBe("https://cursor.test/hooks/placeholder-done");
-		const init = firstCall?.[1] as RequestInit;
+		expect(fetchMock).toHaveBeenCalled();
+		const cursorCall = firstCursorFetchCall(fetchMock.mock.calls);
+		expect(cursorCall?.[0]).toBe("https://cursor.test/hooks/placeholder-done");
+		const init = cursorCall?.[1] as RequestInit;
 		const headers = new Headers(init.headers);
 		expect(headers.get("authorization")).toBe("Bearer test-token-done");
 		const posted = JSON.parse(init.body as string) as {
@@ -125,7 +175,6 @@ describe("Linear webhook router", () => {
 				state: { name: "Backlog" },
 				labelIds: [],
 				labels: [],
-				project: TEST_PROJECT,
 			},
 			updatedFrom: {
 				state: { name: "Todo" },
@@ -144,6 +193,10 @@ describe("Linear webhook router", () => {
 		const body = (await response.json()) as { matchedRules: string[] };
 		expect(body.matchedRules).toContain("refine-issues");
 		expect(fetchMock).toHaveBeenCalledWith(
+			"https://api.linear.app/graphql",
+			expect.objectContaining({ method: "POST" }),
+		);
+		expect(fetchMock).toHaveBeenCalledWith(
 			"https://cursor.test/hooks/refine-issues",
 			expect.any(Object),
 		);
@@ -159,7 +212,6 @@ describe("Linear webhook router", () => {
 				state: { name: "Backlog" },
 				labelIds: [],
 				labels: [],
-				project: TEST_PROJECT,
 			},
 		};
 		const request = buildLinearWebhookRequest(
@@ -178,8 +230,8 @@ describe("Linear webhook router", () => {
 			"https://cursor.test/hooks/refine-issues",
 			expect.any(Object),
 		);
-		const firstCall = fetchMock.mock.calls[0];
-		const init = firstCall?.[1] as RequestInit;
+		const cursorCall = firstCursorFetchCall(fetchMock.mock.calls);
+		const init = cursorCall?.[1] as RequestInit;
 		const posted = JSON.parse(init.body as string) as {
 			normalizedEvents: { kind: string }[];
 		};
@@ -195,7 +247,6 @@ describe("Linear webhook router", () => {
 				id: "new-issue-uuid",
 				labelIds: [],
 				labels: [],
-				project: TEST_PROJECT,
 			},
 		};
 		const request = buildLinearWebhookRequest(
@@ -213,8 +264,8 @@ describe("Linear webhook router", () => {
 			"https://cursor.test/hooks/placeholder-issue-created",
 			expect.any(Object),
 		);
-		const firstCall = fetchMock.mock.calls[0];
-		const init = firstCall?.[1] as RequestInit;
+		const cursorCall = firstCursorFetchCall(fetchMock.mock.calls);
+		const init = cursorCall?.[1] as RequestInit;
 		const posted = JSON.parse(init.body as string) as {
 			normalizedEvents: { kind: string; issueId: string }[];
 		};
@@ -309,8 +360,8 @@ describe("Linear webhook router", () => {
 			"https://cursor.test/hooks/placeholder-reaction",
 			expect.any(Object),
 		);
-		const firstCall = fetchMock.mock.calls[0];
-		const init = firstCall?.[1] as RequestInit;
+		const cursorCall = firstCursorFetchCall(fetchMock.mock.calls);
+		const init = cursorCall?.[1] as RequestInit;
 		const posted = JSON.parse(init.body as string) as {
 			normalizedEvents: { kind: string; emoji: string }[];
 		};
@@ -346,8 +397,8 @@ describe("Linear webhook router", () => {
 			"https://cursor.test/hooks/placeholder-reaction-robot-face",
 			expect.any(Object),
 		);
-		const firstCall = fetchMock.mock.calls[0];
-		const init = firstCall?.[1] as RequestInit;
+		const cursorCall = firstCursorFetchCall(fetchMock.mock.calls);
+		const init = cursorCall?.[1] as RequestInit;
 		const headers = new Headers(init.headers);
 		expect(headers.get("authorization")).toBe("Bearer test-token-bot-routing");
 		const posted = JSON.parse(init.body as string) as {
@@ -390,8 +441,8 @@ describe("Linear webhook router", () => {
 			"https://cursor.test/hooks/placeholder-reaction-robot-face",
 			expect.any(Object),
 		);
-		const firstCall = fetchMock.mock.calls[0];
-		const init = firstCall?.[1] as RequestInit;
+		const cursorCall = firstCursorFetchCall(fetchMock.mock.calls);
+		const init = cursorCall?.[1] as RequestInit;
 		const headers = new Headers(init.headers);
 		expect(headers.get("authorization")).toBeNull();
 		expect(warnSpy).toHaveBeenCalledWith(
@@ -426,7 +477,7 @@ describe("Linear webhook router", () => {
 		expect(response.status).toBe(200);
 		const body = (await response.json()) as { matchedRules: string[] };
 		expect(body.matchedRules).toEqual([]);
-		expect(fetchMock).not.toHaveBeenCalled();
+		expect(firstCursorFetchCall(fetchMock.mock.calls)).toBeUndefined();
 	});
 
 	it("does not call Cursor when no rule matches", async () => {
@@ -485,7 +536,7 @@ describe("matchingProjects rule filter", () => {
 		CURSOR_WEBHOOK_TEST_SCOPED: "https://cursor.test/hooks/scoped",
 	};
 
-	it("does not match when rule lists matchingProjects but payload has no project", () => {
+	it("matches when scoped rule has no project in payload (fail-open project filter)", () => {
 		const rules: RoutingRule[] = [
 			{
 				id: "scoped-done",
@@ -509,7 +560,8 @@ describe("matchingProjects rule filter", () => {
 			},
 		});
 		const matches = matchRoutes(events, rules, envForMatch);
-		expect(matches).toHaveLength(0);
+		expect(matches).toHaveLength(1);
+		expect(matches[0]?.rule.id).toBe("scoped-done");
 	});
 
 	it("matches when project id is listed in matchingProjects", () => {

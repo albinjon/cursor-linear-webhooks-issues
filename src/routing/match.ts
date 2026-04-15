@@ -10,7 +10,8 @@ function eventMatchesProjectFilter(
 		.filter((s) => s.length > 0);
 	if (!want?.length) return true;
 	const got = ev.projectIdents;
-	if (!got?.length) return false;
+	// Fail-open: webhooks often omit project; GraphQL enrichment may also return nothing.
+	if (!got?.length) return true;
 	return want.some((w) => got.includes(w));
 }
 
