@@ -110,6 +110,78 @@ describe("enrichProjectFromApi", () => {
 		expect(out[0]?.projectIdents).toContain("v1");
 	});
 
+	it("logs linear_graphql_issue_project_ok on successful GraphQL response", async () => {
+		const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+		const rules: RoutingRule[] = [
+			{
+				id: "a",
+				when: { type: "statusChangedTo", statusName: "Done" },
+				matchingProjects: ["v1"],
+				targetEnvKey: "X",
+			},
+		];
+		const events = normalizeLinearPayload({
+			type: "Issue",
+			action: "update",
+			data: {
+				id: "issue-1",
+				state: { name: "Done" },
+				labelIds: [],
+				labels: [],
+			},
+			updatedFrom: { state: { name: "Todo" }, labelIds: [] },
+		});
+		const fetchMock = vi.fn(async () => {
+			return new Response(
+				JSON.stringify({
+					data: {
+						issue: {
+							id: "issue-1",
+							project: { id: "proj-id", name: "P", slugId: "v1" },
+						},
+					},
+				}),
+				{ status: 200, headers: { "Content-Type": "application/json" } },
+			);
+		});
+
+		await enrichNormalizedEventsWithLinearProjects(
+			events,
+			rules,
+			{ LINEAR_API_KEY: "key" },
+			fetchMock,
+		);
+
+		const okLog = logSpy.mock.calls
+			.map((c) => c[0] as string)
+			.find((line) => {
+				try {
+					return (JSON.parse(line) as { msg?: string }).msg ===
+						"linear_graphql_issue_project_ok";
+				} catch {
+					return false;
+				}
+			});
+		expect(okLog).toBeDefined();
+		const payload = JSON.parse(okLog as string) as {
+			msg: string;
+			issueId: string;
+			graphqlProject: { id: string; name: string; slugId: string };
+			projectIdents: string[];
+		};
+		expect(payload.issueId).toBe("issue-1");
+		expect(payload.graphqlProject).toEqual({
+			id: "proj-id",
+			name: "P",
+			slugId: "v1",
+		});
+		expect(payload.projectIdents).toContain("proj-id");
+		expect(payload.projectIdents).toContain("v1");
+
+		logSpy.mockRestore();
+	});
+
 	it("logs when Linear GraphQL returns a non-OK status", async () => {
 		const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 

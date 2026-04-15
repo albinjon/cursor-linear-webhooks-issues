@@ -151,7 +151,25 @@ async function fetchProjectIdentsForIssue(
 	}
 
 	const proj = body.data?.issue?.project;
-	return projectIdentsFromGraphqlProject(proj ?? null);
+	const projectIdents = projectIdentsFromGraphqlProject(proj ?? null);
+	const graphqlProject = proj
+		? {
+				...(typeof proj.id === "string" && proj.id.length > 0
+					? { id: proj.id }
+					: {}),
+				...(proj.name != null ? { name: proj.name } : {}),
+				...(proj.slugId != null ? { slugId: proj.slugId } : {}),
+			}
+		: null;
+	console.log(
+		JSON.stringify({
+			msg: "linear_graphql_issue_project_ok",
+			issueId,
+			graphqlProject,
+			projectIdents,
+		}),
+	);
+	return projectIdents;
 }
 
 function mergeIdents(

@@ -1,6 +1,26 @@
+import type { NormalizedEvent } from "./normalize";
 import { processLinearWebhook } from "./pipeline";
 import { linearWebhookPayloadSchema } from "./webhookEnvelope";
 import { verifyLinearSignature, verifyWebhookTimestampFreshness } from "./verify";
+
+function normalizedEventsDebug(events: NormalizedEvent[]) {
+	return events.map((e) => {
+		if (e.kind === "reaction") {
+			return {
+				kind: e.kind,
+				issueId: e.issueId,
+				projectIdents: e.projectIdents,
+				emoji: e.emoji,
+				reactionAction: e.reactionAction,
+			};
+		}
+		return {
+			kind: e.kind,
+			issueId: e.issueId,
+			projectIdents: e.projectIdents,
+		};
+	});
+}
 
 function jsonResponse(body: unknown, status = 200): Response {
 	return new Response(JSON.stringify(body), {
@@ -91,6 +111,7 @@ export async function handleLinearWebhookPost(
 			linearDelivery,
 			linearEvent,
 			normalizedCount: events.length,
+			normalizedEventsDebug: normalizedEventsDebug(events),
 			matchedRules: matches.map((m) => m.rule.id),
 			dispatchResults,
 		}),
