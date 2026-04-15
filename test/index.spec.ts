@@ -53,8 +53,8 @@ describe("Linear webhook router", () => {
 					}
 					const project =
 						issueId.includes("wrong-proj-issue") || issueId === "other-issue-uuid"
-							? { id: "other-proj", name: "Beta", slug: "beta" }
-							: { id: "v1", name: "Test project", slug: "v1" };
+							? { id: "other-proj", name: "Beta", slugId: "beta" }
+							: { id: "v1", name: "Test project", slugId: "v1" };
 					return new Response(
 						JSON.stringify({
 							data: {

@@ -87,7 +87,7 @@ describe("enrichProjectFromApi", () => {
 					data: {
 						issue: {
 							id: "issue-1",
-							project: { id: "v1", name: "P", slug: "v1" },
+							project: { id: "v1", name: "P", slugId: "v1" },
 						},
 					},
 				}),

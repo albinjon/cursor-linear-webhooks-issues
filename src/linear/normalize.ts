@@ -45,7 +45,7 @@ export type NormalizedEvent =
 			projectIdents?: string[];
 	  };
 
-/** Distinct non-empty project id, name, slug, or key strings from a Linear entity payload. */
+/** Distinct non-empty project id, name, slugId, slug, or key strings from a Linear entity payload. */
 function projectIdentsFromRecord(data: Record<string, unknown>): string[] {
 	const out: string[] = [];
 	const add = (s: unknown) => {
@@ -58,12 +58,14 @@ function projectIdentsFromRecord(data: Record<string, unknown>): string[] {
 		if (parsed.success) {
 			add(parsed.data.id);
 			add(parsed.data.name);
+			add(parsed.data.slugId);
 			add(parsed.data.slug);
 			add(parsed.data.key);
 		} else {
 			const p = proj as Record<string, unknown>;
 			add(p.id);
 			add(p.name);
+			add(p.slugId);
 			add(p.slug);
 			add(p.key);
 		}

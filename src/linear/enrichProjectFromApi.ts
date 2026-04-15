@@ -16,7 +16,7 @@ const ISSUE_PROJECT_QUERY = `query IssueProjectForRouting($issueId: String!) {
 		project {
 			id
 			name
-			slug
+			slugId
 		}
 	}
 }`;
@@ -32,7 +32,13 @@ function projectIdentsFromGraphqlProject(
 ): string[] {
 	if (!project) return [];
 	const out: string[] = [];
-	for (const v of [project.id, project.name, project.slug, project.key]) {
+	for (const v of [
+		project.id,
+		project.name,
+		project.slugId,
+		project.slug,
+		project.key,
+	]) {
 		if (typeof v === "string" && v.length > 0) out.push(v);
 	}
 	return [...new Set(out)];
@@ -157,7 +163,7 @@ function mergeIdents(
 
 /**
  * When rules use matchingProjects and events lack projectIdents (typical for webhooks),
- * loads each issue's project via Linear GraphQL and merges id, name, slug into projectIdents.
+ * loads each issue's project via Linear GraphQL and merges id, name, slugId (and legacy slug/key) into projectIdents.
  * No-op if LINEAR_API_KEY is missing, no rules need projects, or all events already have idents.
  */
 export async function enrichNormalizedEventsWithLinearProjects(
