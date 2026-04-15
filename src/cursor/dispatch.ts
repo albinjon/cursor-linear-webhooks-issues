@@ -1,3 +1,5 @@
+import type { NormalizedEvent } from "../linear/normalize";
+
 /** Keep under Linear's 5s webhook response budget (with margin). */
 const DEFAULT_TIMEOUT_MS = 4_000;
 const MAX_RETRIES = 1;
@@ -7,7 +9,7 @@ export interface DispatchPayload {
 	ruleId: string;
 	linearDelivery: string | null;
 	linearEvent: string | null;
-	normalizedEvents: unknown[];
+	normalizedEvents: NormalizedEvent[];
 	linearPayload: unknown;
 }
 

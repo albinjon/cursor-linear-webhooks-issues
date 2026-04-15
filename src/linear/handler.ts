@@ -1,9 +1,5 @@
-import { dispatchToCursorWebhooks, type DispatchPayload } from "../cursor/dispatch";
-import { enrichNormalizedEventsWithLinearProjects } from "./enrichProjectFromApi";
-import { normalizeLinearPayload } from "./normalize";
-import { ROUTING_RULES } from "../routing/rules";
-import { matchRoutes } from "../routing/match";
-import type { LinearWebhookPayloadBase } from "./verify";
+import { processLinearWebhook } from "./pipeline";
+import { linearWebhookPayloadSchema } from "./webhookEnvelope";
 import { verifyLinearSignature, verifyWebhookTimestampFreshness } from "./verify";
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -35,6 +31,12 @@ export async function handleLinearWebhookPost(
 		return jsonResponse({ error: "invalid json" }, 400);
 	}
 
+	const envelope = linearWebhookPayloadSchema.safeParse(parsed);
+	if (!envelope.success) {
+		return jsonResponse({ error: "invalid json body" }, 400);
+	}
+	const payload = envelope.data;
+
 	const windowMs = Number.parseInt(
 		env.LINEAR_REPLAY_WINDOW_MS ?? "60000",
 		10,
@@ -42,7 +44,7 @@ export async function handleLinearWebhookPost(
 	const replayWindow = Number.isFinite(windowMs) ? windowMs : 60_000;
 	if (
 		!verifyWebhookTimestampFreshness(
-			parsed as LinearWebhookPayloadBase,
+			payload,
 			Date.now(),
 			replayWindow,
 			false,
@@ -59,60 +61,29 @@ export async function handleLinearWebhookPost(
 			msg: "linear_webhook_payload",
 			linearDelivery,
 			linearEvent,
-			linearPayload: parsed,
+			linearPayload: payload,
 		}),
 	);
 
-	let events = normalizeLinearPayload(parsed);
-	events = await enrichNormalizedEventsWithLinearProjects(
-		events,
-		ROUTING_RULES,
+	const { events, matches, dispatchResults } = await processLinearWebhook(
+		payload,
 		env,
+		{ linearDelivery, linearEvent },
 	);
+
 	if (events.length === 0) {
-		const top =
-			parsed !== null &&
-			typeof parsed === "object" &&
-			!Array.isArray(parsed)
-				? (parsed as Record<string, unknown>)
-				: null;
+		const rec = payload as Record<string, unknown>;
 		console.warn(
 			JSON.stringify({
 				msg: "linear_webhook_normalization_empty",
 				linearDelivery,
 				linearEvent,
-				payloadType: top?.type,
-				payloadAction: top?.action,
-				linearPayload: parsed,
+				payloadType: rec.type,
+				payloadAction: rec.action,
+				linearPayload: payload,
 			}),
 		);
 	}
-
-	const matches = matchRoutes(
-		events,
-		ROUTING_RULES,
-		env as unknown as Record<string, string | undefined>,
-	);
-
-	const routes = matches.map((m) => {
-		const body: DispatchPayload = {
-			source: "linear-router",
-			ruleId: m.rule.id,
-			linearDelivery,
-			linearEvent,
-			normalizedEvents: m.events,
-			linearPayload: parsed,
-		};
-		return {
-			ruleId: m.rule.id,
-			targetUrl: m.targetUrl,
-			authToken: m.authToken,
-			body,
-		};
-	});
-
-	const dispatchResults =
-		routes.length > 0 ? await dispatchToCursorWebhooks(routes) : [];
 
 	console.log(
 		JSON.stringify({

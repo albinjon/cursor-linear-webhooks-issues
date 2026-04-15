@@ -3,8 +3,10 @@
  * routing rules use matchingProjects. See README for LINEAR_API_KEY.
  */
 
+import { z } from "zod";
 import type { NormalizedEvent } from "./normalize";
 import type { RoutingRule } from "../routing/types";
+import { projectLikeSchema } from "./schemas";
 
 const LINEAR_GRAPHQL_URL = "https://api.linear.app/graphql";
 
@@ -26,12 +28,7 @@ export function rulesNeedProjectResolution(rules: RoutingRule[]): boolean {
 }
 
 function projectIdentsFromGraphqlProject(
-	project: {
-		id?: string | null;
-		name?: string | null;
-		slug?: string | null;
-		key?: string | null;
-	} | null,
+	project: z.infer<typeof projectLikeSchema> | null,
 ): string[] {
 	if (!project) return [];
 	const out: string[] = [];
@@ -42,7 +39,6 @@ function projectIdentsFromGraphqlProject(
 }
 
 function issueIdFromNormalizedEvent(ev: NormalizedEvent): string | undefined {
-	if (ev.kind === "reaction") return ev.issueId;
 	return ev.issueId;
 }
 
@@ -51,19 +47,19 @@ function eventNeedsProjectIdents(ev: NormalizedEvent): boolean {
 	return !idents?.length;
 }
 
-type GraphQLResponse = {
-	data?: {
-		issue?: {
-			id: string;
-			project?: {
-				id: string;
-				name?: string | null;
-				slug?: string | null;
-			} | null;
-		} | null;
-	};
-	errors?: { message: string }[];
-};
+const issueProjectGraphqlResponseSchema = z.object({
+	data: z
+		.object({
+			issue: z
+				.object({
+					id: z.string(),
+					project: projectLikeSchema.nullish().optional(),
+				})
+				.nullish(),
+		})
+		.optional(),
+	errors: z.array(z.object({ message: z.string() })).optional(),
+});
 
 async function fetchProjectIdentsForIssue(
 	issueId: string,
@@ -82,14 +78,17 @@ async function fetchProjectIdentsForIssue(
 		}),
 	});
 	if (!res.ok) return [];
-	let json: GraphQLResponse;
+	let json: unknown;
 	try {
-		json = (await res.json()) as GraphQLResponse;
+		json = await res.json();
 	} catch {
 		return [];
 	}
-	if (json.errors?.length) return [];
-	const proj = json.data?.issue?.project;
+	const parsed = issueProjectGraphqlResponseSchema.safeParse(json);
+	if (!parsed.success) return [];
+	const body = parsed.data;
+	if (body.errors?.length) return [];
+	const proj = body.data?.issue?.project;
 	return projectIdentsFromGraphqlProject(proj ?? null);
 }
 

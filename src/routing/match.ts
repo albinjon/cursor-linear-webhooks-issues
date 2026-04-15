@@ -41,8 +41,11 @@ function eventMatchesCondition(
 			const wantAction = w.reactionAction ?? "create";
 			return ev.reactionAction === wantAction;
 		}
-		default:
+		default: {
+			const _exhaustive: never = w;
+			void _exhaustive;
 			return false;
+		}
 	}
 }
 

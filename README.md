@@ -216,6 +216,8 @@ The Worker sends:
 
 If the create payload has **no** workflow state name (missing `state` or empty name), routing falls back to the `**issue-created`** rule and `normalizedEvents` contains `kind: "issueCreated"` only.
 
+**Reactions:** entries with `kind: "reaction"` use Linear’s emoji **shortcode** string (e.g. `thumbsup`, `robot_face`), not Unicode. The payload may include **`commentId`**, **`issueId`**, or **both**; some webhooks only include **`issueId`** (issue-level reaction with no comment). Cursor automations should treat `commentId` as optional when branching on reactions.
+
 Your Cursor automation should read this body as needed (often `linearPayload` plus `ruleId`).
 
 ---
@@ -244,7 +246,7 @@ Rules are defined in code; **each rule reads one env var** for the destination U
 | `CURSOR_WEBHOOK_PLACEHOLDER_DONE`                  | Status **changes to** `Done`                                                           |
 | `CURSOR_WEBHOOK_PLACEHOLDER_LABEL_BLOCKED_REMOVED` | Label **Blocked** removed                                                              |
 | `CURSOR_WEBHOOK_PLACEHOLDER_COMMENT`               | **Comment** created                                                                    |
-| `CURSOR_WEBHOOK_PLACEHOLDER_REACTION_THUMBSUP`     | **`thumbsup`** reaction **added** on a comment (Linear shortcode, not Unicode)          |
+| `CURSOR_WEBHOOK_PLACEHOLDER_REACTION_THUMBSUP`     | **`thumbsup`** reaction **added** (comment and/or issue; Linear shortcode, not Unicode) |
 
 
 ### Secret

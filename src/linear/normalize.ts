@@ -1,9 +1,11 @@
 /**
  * Normalized events for routing (names for status/labels; reaction emoji is Linear’s shortcode string, e.g. `thumbsup`, `robot_face`).
+ * Reactions may be **comment-scoped** (`commentId`) and/or **issue-scoped** (`issueId`) depending on Linear’s payload.
  * Validation + branching via Zod union; domain rules live in small pure helpers.
  */
 
 import { z } from "zod";
+import { projectLikeSchema } from "./schemas";
 
 export type NormalizedEvent =
 	| {
@@ -30,7 +32,9 @@ export type NormalizedEvent =
 	| {
 			kind: "reaction";
 			emoji: string;
-			commentId: string;
+			/** Present for comment reactions; omitted for issue-only reactions. */
+			commentId?: string;
+			/** Present when Linear sends `issueId` / nested issue (including issue-only reactions). */
 			issueId?: string;
 			reactionAction: "create" | "remove";
 			projectIdents?: string[];
@@ -50,11 +54,19 @@ function projectIdentsFromRecord(data: Record<string, unknown>): string[] {
 	add(data.projectId);
 	const proj = data.project;
 	if (proj && typeof proj === "object" && proj !== null) {
-		const p = proj as Record<string, unknown>;
-		add(p.id);
-		add(p.name);
-		add(p.slug);
-		add(p.key);
+		const parsed = projectLikeSchema.safeParse(proj);
+		if (parsed.success) {
+			add(parsed.data.id);
+			add(parsed.data.name);
+			add(parsed.data.slug);
+			add(parsed.data.key);
+		} else {
+			const p = proj as Record<string, unknown>;
+			add(p.id);
+			add(p.name);
+			add(p.slug);
+			add(p.key);
+		}
 	}
 	return [...new Set(out)];
 }
@@ -88,32 +100,26 @@ const issueDataSchema = z
 					.passthrough(),
 			)
 			.nullish(),
+		projectId: z.string().nullish().optional(),
+		project: projectLikeSchema.nullish().optional(),
 	})
 	.passthrough();
 
 type IssueData = z.infer<typeof issueDataSchema>;
 
 function projectIdentsFromIssueData(data: IssueData): string[] {
-	return projectIdentsFromRecord(data as unknown as Record<string, unknown>);
+	return projectIdentsFromRecord({
+		projectId: data.projectId,
+		project: data.project,
+	});
 }
 
 function mergeProjectIdents(...groups: string[][]): string[] {
 	return [...new Set(groups.flat())];
 }
 
-function projectIdentsFromCommentData(data: Record<string, unknown>): string[] {
-	const direct = projectIdentsFromRecord(data);
-	const issue = data.issue;
-	if (issue && typeof issue === "object") {
-		return mergeProjectIdents(
-			direct,
-			projectIdentsFromRecord(issue as Record<string, unknown>),
-		);
-	}
-	return direct;
-}
-
-function projectIdentsFromIssueLabelData(data: Record<string, unknown>): string[] {
+/** Comment / IssueLabel webhook payloads with optional nested `issue` carrying project fields. */
+function projectIdentsFromIssueNestedPayload(data: Record<string, unknown>): string[] {
 	const direct = projectIdentsFromRecord(data);
 	const issue = data.issue;
 	if (issue && typeof issue === "object") {
@@ -203,7 +209,7 @@ const commentCreateWebhook = z
 			.passthrough(),
 	})
 	.transform(({ data }) => {
-		const idents = projectIdentsFromCommentData(
+		const idents = projectIdentsFromIssueNestedPayload(
 			data as unknown as Record<string, unknown>,
 		);
 		const ev: NormalizedEvent = {
@@ -271,7 +277,7 @@ const issueLabelRemoveWebhook = z
 			.passthrough(),
 	})
 	.transform(({ data }) => {
-		const idents = projectIdentsFromIssueLabelData(
+		const idents = projectIdentsFromIssueNestedPayload(
 			data as unknown as Record<string, unknown>,
 		);
 		const ev: NormalizedEvent = {
@@ -282,23 +288,26 @@ const issueLabelRemoveWebhook = z
 		return mapWithProjectIdents([ev], idents);
 	});
 
-/** Linear `Reaction` entity — emoji on a comment (shape may include nested `comment`). */
+const reactionIssueRefSchema = z
+	.object({
+		id: z.string(),
+	})
+	.merge(projectLikeSchema.partial())
+	.passthrough();
+
+/** Linear `Reaction` entity — on a comment and/or issue (nested `comment` and/or `issue`). */
 const reactionDataSchema = z
 	.object({
 		id: z.string(),
 		emoji: z.string(),
 		commentId: z.string().nullish(),
 		issueId: z.string().nullish(),
+		issue: reactionIssueRefSchema.optional(),
 		comment: z
 			.object({
 				id: z.string().optional(),
 				issueId: z.string().nullish(),
-				issue: z
-					.object({
-						id: z.string(),
-					})
-					.passthrough()
-					.optional(),
+				issue: reactionIssueRefSchema.optional(),
 			})
 			.passthrough()
 			.nullish(),
@@ -329,9 +338,15 @@ function issueIdFromReaction(data: ReactionData): string | undefined {
 }
 
 function projectIdentsFromReactionData(data: ReactionData): string[] {
-	const c = data.comment;
-	if (!c?.issue || typeof c.issue !== "object") return [];
-	return projectIdentsFromRecord(c.issue as Record<string, unknown>);
+	const fromCommentIssue =
+		data.comment?.issue && typeof data.comment.issue === "object"
+			? projectIdentsFromRecord(data.comment.issue as Record<string, unknown>)
+			: [];
+	const fromTopIssue =
+		data.issue && typeof data.issue === "object"
+			? projectIdentsFromRecord(data.issue as Record<string, unknown>)
+			: [];
+	return mergeProjectIdents(fromCommentIssue, fromTopIssue);
 }
 
 function reactionEvents(
@@ -339,25 +354,39 @@ function reactionEvents(
 	reactionAction: "create" | "remove",
 ): NormalizedEvent[] {
 	const commentId = commentIdFromReaction(data);
-	if (!commentId) return [];
 	const issueId = issueIdFromReaction(data);
 	const idents = projectIdentsFromReactionData(data);
-	const ev: NormalizedEvent =
-		issueId !== undefined
-			? {
-					kind: "reaction",
-					emoji: data.emoji,
-					commentId,
-					issueId,
-					reactionAction,
-				}
-			: {
-					kind: "reaction",
-					emoji: data.emoji,
-					commentId,
-					reactionAction,
-				};
-	return mapWithProjectIdents([ev], idents);
+
+	if (commentId) {
+		const ev: NormalizedEvent =
+			issueId !== undefined
+				? {
+						kind: "reaction",
+						emoji: data.emoji,
+						commentId,
+						issueId,
+						reactionAction,
+					}
+				: {
+						kind: "reaction",
+						emoji: data.emoji,
+						commentId,
+						reactionAction,
+					};
+		return mapWithProjectIdents([ev], idents);
+	}
+
+	if (issueId) {
+		const ev: NormalizedEvent = {
+			kind: "reaction",
+			emoji: data.emoji,
+			issueId,
+			reactionAction,
+		};
+		return mapWithProjectIdents([ev], idents);
+	}
+
+	return [];
 }
 
 const reactionCreateWebhook = z

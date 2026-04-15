@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import type { LinearWebhookPayloadParsed } from "./webhookEnvelope";
 
 /**
  * Verifies `Linear-Signature` (hex HMAC-SHA256 of raw body) per
@@ -29,23 +30,18 @@ export function verifyLinearSignature(
 	return timingSafeEqual(headerBuf, computed);
 }
 
-export interface LinearWebhookPayloadBase {
-	webhookTimestamp?: number;
-	[key: string]: unknown;
-}
-
 /**
  * Rejects replays when |now - webhookTimestamp| > windowMs.
  * Returns true if valid or if timestamp missing and allowMissing is true.
  */
 export function verifyWebhookTimestampFreshness(
-	payload: LinearWebhookPayloadBase,
+	payload: LinearWebhookPayloadParsed,
 	nowMs: number,
 	windowMs: number,
 	allowMissing = false,
 ): boolean {
 	const ts = payload.webhookTimestamp;
-	if (typeof ts !== "number" || !Number.isFinite(ts)) {
+	if (ts === undefined) {
 		return allowMissing;
 	}
 	return Math.abs(nowMs - ts) <= windowMs;

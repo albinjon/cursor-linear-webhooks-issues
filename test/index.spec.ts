@@ -409,6 +409,69 @@ describe("Linear webhook router", () => {
 		);
 	});
 
+	it("normalizes and dispatches issue-only Reaction without commentId (Linear production shape)", async () => {
+		const payload = {
+			webhookTimestamp: Date.now(),
+			type: "Reaction",
+			action: "create",
+			data: {
+				id: "b059265c-9e28-43a5-ab6a-7f516320415c",
+				emoji: "robot_face",
+				issueId: "b9666aaa-996c-48bb-80f5-704ee21ef0a0",
+				issue: {
+					id: "b9666aaa-996c-48bb-80f5-704ee21ef0a0",
+					title: "Kontosökning",
+					teamId: "5ffbce43-55dc-4c73-b3ad-5e4fb5629aaa",
+					team: {
+						id: "5ffbce43-55dc-4c73-b3ad-5e4fb5629aaa",
+						key: "LAV",
+						name: "Lavora",
+					},
+					identifier: "LAV-142",
+					url: "https://linear.app/myledger/issue/LAV-142/x",
+				},
+			},
+		};
+		const direct = normalizeLinearPayload(payload);
+		expect(direct).toHaveLength(1);
+		const nev = direct[0] as {
+			kind: string;
+			commentId?: string;
+			issueId?: string;
+			emoji: string;
+		};
+		expect(nev.kind).toBe("reaction");
+		expect(nev.emoji).toBe("robot_face");
+		expect(nev.commentId).toBeUndefined();
+		expect(nev.issueId).toBe("b9666aaa-996c-48bb-80f5-704ee21ef0a0");
+
+		const request = buildLinearWebhookRequest(
+			"https://example.com/webhooks/linear",
+			payload,
+			{ "Linear-Event": "Reaction" },
+		);
+		const ctx = createExecutionContext();
+		const response = await worker.fetch(request, env, ctx);
+		await waitOnExecutionContext(ctx);
+		expect(response.status).toBe(200);
+		const body = (await response.json()) as { matchedRules: string[] };
+		expect(body.matchedRules).toContain("reaction-robot-face");
+		const cursorCall = firstCursorFetchCall(fetchMock.mock.calls);
+		const init = cursorCall?.[1] as RequestInit;
+		const posted = JSON.parse(init.body as string) as {
+			normalizedEvents: Array<{
+				kind: string;
+				emoji: string;
+				commentId?: string;
+				issueId?: string;
+			}>;
+		};
+		const postedEv = posted.normalizedEvents.find((e) => e.kind === "reaction");
+		expect(postedEv?.emoji).toBe("robot_face");
+		expect(postedEv?.commentId).toBeUndefined();
+		expect(postedEv?.issueId).toBe("b9666aaa-996c-48bb-80f5-704ee21ef0a0");
+	});
+
 	it("dispatches without Authorization when per-rule token is missing (fail-open)", async () => {
 		const envWithoutBotToken = {
 			...env,
