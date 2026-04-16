@@ -81,6 +81,7 @@ function mapWithProjectIdents(
 
 const stateRefSchema = z
 	.object({
+		id: z.string().optional(),
 		name: z.string().nullish(),
 	})
 	.passthrough();
@@ -134,6 +135,8 @@ function projectIdentsFromIssueNestedPayload(data: Record<string, unknown>): str
 const updatedFromSchema = z
 	.object({
 		state: stateRefSchema.nullish().optional(),
+		/** Linear sometimes sends previous workflow state id without nested `state`. */
+		stateId: z.string().optional(),
 		labelIds: z.array(z.string()).optional(),
 	})
 	.passthrough();
@@ -145,6 +148,13 @@ function readStateName(
 ): string | null {
 	const n = state?.name;
 	return typeof n === "string" ? n : null;
+}
+
+function readStateId(
+	state: { id?: string | null } | null | undefined,
+): string | null {
+	const id = state?.id;
+	return typeof id === "string" && id.length > 0 ? id : null;
 }
 
 function buildLabelIdToName(data: IssueData): Map<string, string> {
@@ -160,27 +170,59 @@ function eventsFromIssueStatus(
 	data: IssueData,
 	updatedFrom: UpdatedFrom | null | undefined,
 ): NormalizedEvent[] {
-	// Issue updates often include full `data.state` without `updatedFrom.state` (e.g. activity-only
-	// refreshes when adding a reaction). Treating missing `updatedFrom.state` as previous=null would
-	// falsely emit a transition into the current column; require an explicit `state` field to compare.
-	if (
-		updatedFrom == null ||
-		!Object.prototype.hasOwnProperty.call(updatedFrom, "state")
-	) {
+	if (updatedFrom == null) return [];
+
+	const hasState = Object.prototype.hasOwnProperty.call(updatedFrom, "state");
+	const hasStateId = Object.prototype.hasOwnProperty.call(
+		updatedFrom,
+		"stateId",
+	);
+
+	// Prefer nested `updatedFrom.state` when present (name-to-name transition).
+	if (hasState) {
+		const prev = readStateName(updatedFrom.state);
+		const next = readStateName(data.state);
+		if (next !== null && prev !== next) {
+			return [
+				{
+					kind: "statusChanged",
+					issueId: data.id,
+					previousStatusName: prev,
+					newStatusName: next,
+				},
+			];
+		}
 		return [];
 	}
-	const prev = readStateName(updatedFrom.state);
-	const next = readStateName(data.state);
-	if (next !== null && prev !== next) {
-		return [
-			{
-				kind: "statusChanged",
-				issueId: data.id,
-				previousStatusName: prev,
-				newStatusName: next,
-			},
-		];
+
+	// Linear may send `updatedFrom.stateId` without `updatedFrom.state`; compare ids to `data.state.id`.
+	// Issue updates often include full `data.state` without any `updatedFrom` state hint — activity-only
+	// refreshes must not emit a transition; require explicit `stateId` (or `state` above) to compare.
+	if (hasStateId) {
+		const prevId =
+			typeof updatedFrom.stateId === "string" && updatedFrom.stateId.length > 0
+				? updatedFrom.stateId
+				: null;
+		const nextId = readStateId(data.state);
+		const next = readStateName(data.state);
+		if (
+			prevId !== null &&
+			nextId !== null &&
+			prevId !== nextId &&
+			next !== null
+		) {
+			return [
+				{
+					kind: "statusChanged",
+					issueId: data.id,
+					previousStatusName: null,
+					newStatusName: next,
+				},
+			];
+		}
+		return [];
 	}
+
 	return [];
 }
 

@@ -202,6 +202,93 @@ describe("Linear webhook router", () => {
 		);
 	});
 
+	it("emits statusChanged when Issue update has updatedFrom.stateId without updatedFrom.state (Linear production shape)", () => {
+		const prevStateId = "e39bfdde-43ac-48d4-afb9-1d30325b58f2";
+		const nextStateId = "d51c0026-b59f-46f1-8d09-d193d2fc3e53";
+		const events = normalizeLinearPayload({
+			type: "Issue",
+			action: "update",
+			data: {
+				id: "issue-uuid",
+				state: {
+					id: nextStateId,
+					name: "Backlog",
+					type: "backlog",
+				},
+				labelIds: [],
+				labels: [],
+			},
+			updatedFrom: {
+				stateId: prevStateId,
+				updatedAt: "2026-04-12T18:58:16.130Z",
+			},
+		});
+		const status = events.filter((e) => e.kind === "statusChanged");
+		expect(status).toHaveLength(1);
+		const ev = status[0] as {
+			kind: string;
+			previousStatusName: string | null;
+			newStatusName: string;
+		};
+		expect(ev.previousStatusName).toBeNull();
+		expect(ev.newStatusName).toBe("Backlog");
+	});
+
+	it("does not emit statusChanged when updatedFrom.stateId matches data.state.id", () => {
+		const sameId = "d51c0026-b59f-46f1-8d09-d193d2fc3e53";
+		const events = normalizeLinearPayload({
+			type: "Issue",
+			action: "update",
+			data: {
+				id: "issue-uuid",
+				state: { id: sameId, name: "Backlog" },
+				labelIds: [],
+				labels: [],
+			},
+			updatedFrom: {
+				stateId: sameId,
+				labelIds: [],
+			},
+		});
+		expect(events.filter((e) => e.kind === "statusChanged")).toEqual([]);
+	});
+
+	it("dispatches to backlog webhook when status changes via updatedFrom.stateId only", async () => {
+		const payload = {
+			webhookTimestamp: Date.now(),
+			type: "Issue",
+			action: "update",
+			data: {
+				id: "issue-uuid",
+				state: {
+					id: "d51c0026-b59f-46f1-8d09-d193d2fc3e53",
+					name: "Backlog",
+				},
+				labelIds: [],
+				labels: [],
+			},
+			updatedFrom: {
+				stateId: "e39bfdde-43ac-48d4-afb9-1d30325b58f2",
+				labelIds: [],
+			},
+		};
+		const request = buildLinearWebhookRequest(
+			"https://example.com/webhooks/linear",
+			payload,
+			{ "Linear-Event": "Issue" },
+		);
+		const ctx = createExecutionContext();
+		const response = await worker.fetch(request, env, ctx);
+		await waitOnExecutionContext(ctx);
+		expect(response.status).toBe(200);
+		const body = (await response.json()) as { matchedRules: string[] };
+		expect(body.matchedRules).toContain("refine-issues");
+		expect(fetchMock).toHaveBeenCalledWith(
+			"https://cursor.test/hooks/refine-issues",
+			expect.any(Object),
+		);
+	});
+
 	it("routes Issue create with initial status through same statusChangedTo rules as transitions", async () => {
 		const payload = {
 			webhookTimestamp: Date.now(),
