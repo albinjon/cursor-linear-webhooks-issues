@@ -133,7 +133,7 @@ On the webhook’s detail page, copy the **signing secret**. Put it in Cloudflar
 
 ### 2.3 Status names must match your workflow
 
-Rules use **exact** workflow state **titles** (e.g. `"Todo"`, `"Review fixes"`). If Linear shows **“To do”** but the rule says `"Todo"`, the rule will not match. Fix the string in `[src/routing/rules.ts](src/routing/rules.ts)` and redeploy.
+Rules use **exact** workflow state **titles** (e.g. `"Todo"`, `"Review Fixes"`). If Linear shows **“To do”** but the rule says `"Todo"`, the rule will not match. Fix the string in `[src/routing/rules.ts](src/routing/rules.ts)` and redeploy.
 
 ### 2.3b Optional: limit a rule to certain Linear projects
 
@@ -235,7 +235,7 @@ Rules are defined in code; **each rule reads one env var** for the destination U
 | ------------------------------ | ------------------------------------------------------------------------------------------- |
 | `CURSOR_WEBHOOK_REFINE_ISSUES` | Status **changes to** `Backlog`, **or** new issue **created** with initial status `Backlog` |
 | `CURSOR_WEBHOOK_IMPLEMENT_PR`  | Status **changes to** `Todo`, **or** issue **created** with initial status `Todo`           |
-| `CURSOR_WEBHOOK_REVIEW_FIXER`  | Status **changes to** `Review fixes`, **or** issue **created** in that state                |
+| `CURSOR_WEBHOOK_REVIEW_FIXER`  | Status **changes to** `Review Fixes`, **or** issue **created** in that state                |
 | `CURSOR_WEBHOOK_REVIEW_GATE`   | **Not used by this Worker** — optional reserved name if you need the URL elsewhere          |
 
 

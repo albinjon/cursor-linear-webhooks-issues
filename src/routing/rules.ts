@@ -38,7 +38,7 @@ export const ROUTING_RULES: RoutingRule[] = [
 	},
 	{
 		id: "review-fixer",
-		when: { type: "statusChangedTo", statusName: "Review fixes" },
+		when: { type: "statusChangedTo", statusName: "Review Fixes" },
 		matchingProjects: defaultProjects,
 		targetEnvKey: "CURSOR_WEBHOOK_REVIEW_FIXER",
 		authTokenEnvKey: "CURSOR_WEBHOOK_REVIEW_FIXER_AUTH_TOKEN",

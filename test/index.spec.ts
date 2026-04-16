@@ -289,6 +289,48 @@ describe("Linear webhook router", () => {
 		);
 	});
 
+	it("dispatches to review-fixer when status changes to Review Fixes via updatedFrom.stateId", async () => {
+		const payload = {
+			webhookTimestamp: Date.now(),
+			type: "Issue",
+			action: "update",
+			data: {
+				id: "7812f470-c16d-4eb5-8f54-206facc50677",
+				stateId: "646b341e-51ca-4c68-9c05-8af7ab3da72f",
+				state: {
+					id: "646b341e-51ca-4c68-9c05-8af7ab3da72f",
+					name: "Review Fixes",
+					type: "started",
+				},
+				project: {
+					id: "d9b75785-f165-4337-b382-8a55ffe03f69",
+					name: "FrontEnd",
+				},
+				labelIds: [],
+				labels: [],
+			},
+			updatedFrom: {
+				stateId: "ef3adeab-f3a8-45d8-a2b1-1624f78a7a76",
+				updatedAt: "2026-04-16T13:00:43.951Z",
+			},
+		};
+		const request = buildLinearWebhookRequest(
+			"https://example.com/webhooks/linear",
+			payload,
+			{ "Linear-Event": "Issue" },
+		);
+		const ctx = createExecutionContext();
+		const response = await worker.fetch(request, env, ctx);
+		await waitOnExecutionContext(ctx);
+		expect(response.status).toBe(200);
+		const body = (await response.json()) as { matchedRules: string[] };
+		expect(body.matchedRules).toContain("review-fixer");
+		expect(fetchMock).toHaveBeenCalledWith(
+			"https://cursor.test/hooks/review-fixer",
+			expect.any(Object),
+		);
+	});
+
 	it("routes Issue create with initial status through same statusChangedTo rules as transitions", async () => {
 		const payload = {
 			webhookTimestamp: Date.now(),
